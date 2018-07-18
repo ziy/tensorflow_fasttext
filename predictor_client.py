@@ -40,7 +40,7 @@ def Request(text, ngrams):
     example = inputs.BuildTextExample(text, ngrams=ngrams)
     request = classification_pb2.ClassificationRequest()
     request.model_spec.name = 'default'
-    request.model_spec.signature_name = 'proba'
+    request.model_spec.signature_name = FLAGS.signature_def
     request.input.example_list.examples.extend([example])
     return request
 
