@@ -15,7 +15,6 @@ from tensorflow.contrib.saved_model.python.saved_model import signature_def_util
 from tensorflow.python.saved_model import loader
 
 tf.flags.DEFINE_string("text", None, "Text to predict label of")
-tf.flags.DEFINE_string("ngrams", None, "List of ngram lengths, E.g. --ngrams=2,3,4")
 tf.flags.DEFINE_string("signature_def", "proba",
                        "Stored signature key of method to call (proba|embedding)")
 tf.flags.DEFINE_string("saved_model", None, "Directory of SavedModel")
@@ -24,7 +23,7 @@ tf.flags.DEFINE_boolean("debug", False, "Debug")
 FLAGS = tf.flags.FLAGS
 
 
-def RunModel(saved_model_dir, signature_def_key, tag, text, ngrams_list=None):
+def RunModel(saved_model_dir, signature_def_key, tag, text):
     saved_model = reader.read_saved_model(saved_model_dir)
     meta_graph =  None
     for meta_graph_def in saved_model.meta_graphs:
@@ -35,12 +34,7 @@ def RunModel(saved_model_dir, signature_def_key, tag, text, ngrams_list=None):
         raise ValueError("Cannot find saved_model with tag" + tag)
     signature_def = signature_def_utils.get_signature_def_by_key(
         meta_graph, signature_def_key)
-    text = text_utils.TokenizeText(text)
-    ngrams = None
-    if ngrams_list is not None:
-        ngrams_list = text_utils.ParseNgramsOpts(ngrams_list)
-        ngrams = text_utils.GenerateNgrams(text, ngrams_list)
-    example = inputs.BuildTextExample(text, ngrams=ngrams)
+    example = inputs.BuildTextExample(text_utils.TokenizeText(text))
     example = example.SerializeToString()
     inputs_feed_dict = {
         signature_def.inputs["inputs"].name: [example],
@@ -63,7 +57,7 @@ def main(_):
     if not FLAGS.text:
         raise ValueError("No --text provided")
     outputs = RunModel(FLAGS.saved_model, FLAGS.signature_def, FLAGS.tag,
-                       FLAGS.text, FLAGS.ngrams)
+                       FLAGS.text)
     if FLAGS.signature_def == "proba":
         print("Proba:", outputs)
         print("Class(1-N):", np.argmax(outputs) + 1)

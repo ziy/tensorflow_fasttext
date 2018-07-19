@@ -5,23 +5,18 @@ Handles both training, evaluation and inference.
 import tensorflow as tf
 
 
-def BuildTextExample(text, ngrams=None, label=None):
+def BuildTextExample(text, label=None):
     record = tf.train.Example()
     text = [tf.compat.as_bytes(x) for x in text]
     record.features.feature["text"].bytes_list.value.extend(text)
     if label is not None:
         label = tf.compat.as_bytes(label)
         record.features.feature["label"].bytes_list.value.append(label)
-    if ngrams is not None:
-        ngrams = [tf.compat.as_bytes(x) for x in ngrams]
-        record.features.feature["ngrams"].bytes_list.value.extend(ngrams)
     return record
 
 
-def ParseSpec(use_ngrams, include_target):
+def ParseSpec(include_target):
     parse_spec = {"text": tf.VarLenFeature(dtype=tf.string)}
-    if use_ngrams:
-        parse_spec["ngrams"] = tf.VarLenFeature(dtype=tf.string)
     if include_target:
         parse_spec["label"] = tf.FixedLenFeature(shape=(), dtype=tf.string,
                                                  default_value=None)
@@ -29,7 +24,6 @@ def ParseSpec(use_ngrams, include_target):
 
 
 def InputFn(mode,
-            use_ngrams,
             input_file,
             vocab_file,
             vocab_size,
@@ -46,7 +40,7 @@ def InputFn(mode,
         num_epochs=None
     def input_fn():
         include_target =  mode != tf.estimator.ModeKeys.PREDICT
-        parse_spec = ParseSpec(use_ngrams, include_target)
+        parse_spec = ParseSpec(include_target)
         print("ParseSpec", parse_spec)
         print("Input file:", input_file)
         features = tf.contrib.learn.read_batch_features(
@@ -59,7 +53,7 @@ def InputFn(mode,
     return input_fn
 
 
-def ServingInputFn(use_ngrams):
-    parse_spec = ParseSpec(use_ngrams, include_target=False)
+def ServingInputFn():
+    parse_spec = ParseSpec(include_target=False)
     return tf.estimator.export.build_parsing_serving_input_receiver_fn(
         parse_spec)

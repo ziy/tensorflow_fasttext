@@ -47,7 +47,7 @@ The following are examples of how to use the applications. Get full help with
 
 To transform input data into tensorflow Example format:
 
-    process_input.py --facebook_input=queries.txt --output_dir=. --ngrams=2,3,4
+    process_input.py --facebook_input=queries.txt --output_dir=.
 
 Or, using a text file with one example per line with an extra file for labels:
 
@@ -60,6 +60,7 @@ To train a text classifier:
       --eval_records=queries.tfrecords \
       --label_file=labels.txt \
       --vocab_file=vocab.txt \
+      --ngrams=2,3,4 \
       --model_dir=model \
       --export_dir=model
 

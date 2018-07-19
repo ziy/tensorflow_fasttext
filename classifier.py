@@ -2,12 +2,10 @@
 
 Inputs:
   words - text to classify
-  ngrams - n char ngrams for each word in words
   labels - output classes to classify
 
 Model:
   word embedding
-  ngram embedding
   LogisticRegression classifier of embeddings to labels
 """
 from __future__ import absolute_import
@@ -17,8 +15,7 @@ from __future__ import print_function
 import inputs
 import sys
 import tensorflow as tf
-from tensorflow.contrib.layers import feature_column
-from tensorflow.contrib.learn.python.learn.estimators.run_config import RunConfig
+import text_utils
 
 
 tf.flags.DEFINE_string("train_records", None,
@@ -38,19 +35,20 @@ tf.flags.DEFINE_string("model_dir", ".",
 tf.flags.DEFINE_string("export_dir", None, "Directory to store savedmodel")
 
 tf.flags.DEFINE_integer("embedding_dimension", 10, "Dimension of word embedding")
-tf.flags.DEFINE_boolean("use_ngrams", False, "Use character ngrams in embedding")
+# tf.flags.DEFINE_boolean("use_ngrams", False, "Use character ngrams in embedding")
 tf.flags.DEFINE_integer("num_ngram_buckets", 1000000,
                         "Number of hash buckets for ngrams")
 tf.flags.DEFINE_integer("ngram_embedding_dimension", 10, "Dimension of word embedding")
+# tf.flags.DEFINE_string("ngrams", None, "List of ngram lengths, E.g. --ngrams=2,3,4")
 
 tf.flags.DEFINE_float("learning_rate", 0.001, "Learning rate for training")
 tf.flags.DEFINE_float("clip_gradient", 5.0, "Clip gradient norm to this ratio")
 tf.flags.DEFINE_integer("batch_size", 128, "Training minibatch size")
-tf.flags.DEFINE_integer("train_steps", 1000,
+tf.flags.DEFINE_integer("train_steps", 10000,
                         "Number of train steps, None for continuous")
 tf.flags.DEFINE_integer("eval_steps", 100, "Number of eval steps")
 tf.flags.DEFINE_integer("num_epochs", None, "Number of training data epochs")
-tf.flags.DEFINE_integer("checkpoint_steps", 1000,
+tf.flags.DEFINE_integer("checkpoint_steps", 10000,
                         "Steps between saving checkpoints")
 tf.flags.DEFINE_integer("num_threads", 1, "Number of reader threads")
 tf.flags.DEFINE_boolean("log_device_placement", False, "log where ops are located")
@@ -71,7 +69,7 @@ if FLAGS.horovod:
 
 def InputFn(mode, input_file):
     return inputs.InputFn(
-        mode, FLAGS.use_ngrams, input_file, FLAGS.vocab_file, FLAGS.vocab_size,
+        mode, input_file, FLAGS.vocab_file, FLAGS.vocab_size,
         FLAGS.embedding_dimension, FLAGS.num_oov_vocab_buckets,
         FLAGS.label_file, FLAGS.num_labels,
         FLAGS.ngram_embedding_dimension, FLAGS.num_ngram_buckets,
@@ -95,9 +93,11 @@ def FastTextEstimator(model_dir, config=None):
     def model_fn(features, labels, mode, params):
         features["text"] = tf.sparse_tensor_to_dense(features["text"],
                                                      default_value=" ")
-        if FLAGS.use_ngrams:
-            features["ngrams"] = tf.sparse_tensor_to_dense(features["ngrams"],
-                                                           default_value=" ")
+        # if FLAGS.use_ngrams:
+        #     if FLAGS.ngrams is not None:
+        #         ngrams_list = text_utils.ParseNgramsOpts(FLAGS.ngrams)
+        #         features["ngrams"] = tf.py_func(text_utils.GenerateNgrams,
+        #                                         [features["text"], ngrams_list], tf.string)
         text_lookup_table = tf.contrib.lookup.index_table_from_file(
             FLAGS.vocab_file, FLAGS.num_oov_vocab_buckets, FLAGS.vocab_size)
         text_ids = text_lookup_table.lookup(features["text"])
@@ -107,15 +107,15 @@ def FastTextEstimator(model_dir, config=None):
         text_embedding = tf.reduce_mean(tf.nn.embedding_lookup(
             text_embedding_w, text_ids), axis=-2)
         input_layer = text_embedding
-        if FLAGS.use_ngrams:
-            ngram_hash = tf.string_to_hash_bucket(features["ngrams"],
-                                                  FLAGS.num_ngram_buckets)
-            ngram_embedding_w = tf.Variable(tf.random_uniform(
-                [FLAGS.num_ngram_buckets, FLAGS.ngram_embedding_dimension], -0.1, 0.1))
-            ngram_embedding = tf.reduce_mean(tf.nn.embedding_lookup(
-                ngram_embedding_w, ngram_hash), axis=-2)
-            ngram_embedding = tf.expand_dims(ngram_embedding, -2)
-            input_layer = tf.concat([text_embedding, ngram_embedding], -1)
+        # if FLAGS.use_ngrams:
+        #     ngram_hash = tf.string_to_hash_bucket(features["ngrams"],
+        #                                           FLAGS.num_ngram_buckets)
+        #     ngram_embedding_w = tf.Variable(tf.random_uniform(
+        #         [FLAGS.num_ngram_buckets, FLAGS.ngram_embedding_dimension], -0.1, 0.1))
+        #     ngram_embedding = tf.reduce_mean(tf.nn.embedding_lookup(
+        #         ngram_embedding_w, ngram_hash), axis=-2)
+        #     ngram_embedding = tf.expand_dims(ngram_embedding, -2)
+        #     input_layer = tf.concat([text_embedding, ngram_embedding], -1)
         num_classes = FLAGS.num_labels
         logits = tf.contrib.layers.fully_connected(
             inputs=input_layer, num_outputs=num_classes,
@@ -176,7 +176,7 @@ def FastTrain():
         if FLAGS.export_dir:
             print("EXPORTING")
             estimator.export_savedmodel(FLAGS.export_dir,
-                                        inputs.ServingInputFn(FLAGS.use_ngrams))
+                                        inputs.ServingInputFn())
 
 
 def main(_):

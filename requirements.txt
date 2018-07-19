@@ -1,3 +1,2 @@
 tensorflow
 six
-nltk

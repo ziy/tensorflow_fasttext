@@ -1,8 +1,11 @@
-from nltk.tokenize import word_tokenize
+import re
+
+
+regex = r"([A-Z](?:\.[A-Z])+\.?|\w+(?:-\w+)*|\$?\d+(?:\.\d+)?%?|\.\.\.|[][.,;\"'?():-_`]|[^\x00-\x7F])"
 
 
 def TokenizeText(text):
-    return word_tokenize(text.lower())
+    return re.findall(regex, text.lower())
 
 
 def ParseNgramsOpts(opts):

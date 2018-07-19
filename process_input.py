@@ -29,8 +29,6 @@ tf.flags.DEFINE_string("labels", None,
                        classification  per line.
                        Must have --text_input defined.
                        Used instead of --facebook_input""")
-tf.flags.DEFINE_string("ngrams", None,
-                       "list of ngram sizes to create, e.g. --ngrams=2,3,4,5")
 tf.flags.DEFINE_string("output_dir", ".",
                        "Directory to store resulting vector models and checkpoints in")
 tf.flags.DEFINE_integer("num_shards", 1,
@@ -38,30 +36,26 @@ tf.flags.DEFINE_integer("num_shards", 1,
 FLAGS = tf.flags.FLAGS
 
 
-def ParseFacebookInput(inputfile, ngrams):
+def ParseFacebookInput(inputfile):
     """Parse input in the format used by facebook FastText.
     labels are formatted as __label__1
     where the label values start at 0.
     """
     examples = []
     for line in open(inputfile):
-        words = line.split()
+        words = line.split(' ', 1)
         # label is first field with __label__ removed
         match = re.match(r'__label__(.+)', words[0])
         label = match.group(1) if match else None
-        # Strip out label and first ,
-        first = 2 if words[1] == "," else 1
-        words = words[first:]
+        words = text_utils.TokenizeText(words[1])
         examples.append({
             "text": words,
             "label": label
         })
-        if ngrams:
-            examples[-1]["ngrams"] = text_utils.GenerateNgrams(words, ngrams)
     return examples
 
 
-def ParseTextInput(textfile, labelsfile, ngrams):
+def ParseTextInput(textfile, labelsfile):
     """Parse input from two text files: text and labels.
     labels are specified 0-offset one per line.
     """
@@ -73,8 +67,6 @@ def ParseTextInput(textfile, labelsfile, ngrams):
                 "text": words,
                 "label": label,
             })
-            if ngrams:
-                examples[-1]["ngrams"] = text_utils.GenerateNgrams(words, ngrams)
     return examples
 
 
@@ -92,8 +84,7 @@ def WriteExamples(examples, outputfile, num_shards):
             shard += 1
             writer = tf.python_io.TFRecordWriter(outputfile + '-%d-of-%d' % \
                                                  (shard, num_shards))
-        record = inputs.BuildTextExample(
-            example["text"], example.get("ngrams", None), example["label"])
+        record = inputs.BuildTextExample(example["text"], example["label"])
         writer.write(record.SerializeToString())
 
 
@@ -120,15 +111,12 @@ def main(_):
         print >>sys.stderr, \
             "Error: You must define either facebook_input or both text_input and labels"
         sys.exit(1)
-    ngrams = None
-    if FLAGS.ngrams:
-        ngrams = text_utils.ParseNgramsOpts(FLAGS.ngrams)
     if FLAGS.facebook_input:
         inputfile = FLAGS.facebook_input
-        examples = ParseFacebookInput(FLAGS.facebook_input, ngrams)
+        examples = ParseFacebookInput(FLAGS.facebook_input)
     else:
         inputfile = FLAGS.text_input
-        examples = ParseTextInput(FLAGS.text_input, FLAGS.labels, ngrams)
+        examples = ParseTextInput(FLAGS.text_input, FLAGS.labels)
     inputfile_base = os.path.splitext(os.path.basename(inputfile))[0]
     outputfile = os.path.join(FLAGS.output_dir, inputfile_base + ".tfrecords")
     WriteExamples(examples, outputfile, FLAGS.num_shards)
