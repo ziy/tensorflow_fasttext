@@ -61,7 +61,7 @@ def ParseFacebookInput(inputfile, ngrams):
     return examples
 
 
-def ParseTextInput(textfile, labelsfie, ngrams):
+def ParseTextInput(textfile, labelsfile, ngrams):
     """Parse input from two text files: text and labels.
     labels are specified 0-offset one per line.
     """
@@ -129,10 +129,11 @@ def main(_):
     else:
         inputfile = FLAGS.text_input
         examples = ParseTextInput(FLAGS.text_input, FLAGS.labels, ngrams)
-    outputfile = os.path.join(FLAGS.output_dir, inputfile + ".tfrecords")
+    inputfile_base = os.path.splitext(os.path.basename(inputfile))[0]
+    outputfile = os.path.join(FLAGS.output_dir, inputfile_base + ".tfrecords")
     WriteExamples(examples, outputfile, FLAGS.num_shards)
-    vocabfile = os.path.join(FLAGS.output_dir, inputfile + ".vocab")
-    labelfile = os.path.join(FLAGS.output_dir, inputfile + ".labels")
+    vocabfile = os.path.join(FLAGS.output_dir, inputfile_base + ".vocab")
+    labelfile = os.path.join(FLAGS.output_dir, inputfile_base + ".labels")
     WriteVocab(examples, vocabfile, labelfile)
 
 
